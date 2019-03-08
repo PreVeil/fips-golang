@@ -211,7 +211,7 @@ func GenerateEcKey(ktype keyType, usage keyUsage) ([]byte, []byte, error) {
 		ref,
 		ctype,
 		keyPtr.Uchar(),
-		C.ulong(ecPrivateKeyLength),
+		C.size_t(ecPrivateKeyLength),
 		C.bool(true),
 	); status != 1 {
 		return nil, nil, fmt.Errorf("GenerateEcKey: C.ec_key_to_binary() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
@@ -224,7 +224,7 @@ func GenerateEcKey(ktype keyType, usage keyUsage) ([]byte, []byte, error) {
 		ref,
 		ctype,
 		pubPtr.Uchar(),
-		C.ulong(pubLen),
+		C.size_t(pubLen),
 		C.bool(false),
 	); status != 1 {
 		return nil, nil, fmt.Errorf("GenerateEcKey: C.ec_key_to_binary() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
@@ -239,7 +239,7 @@ func EcKeyToPublic(key []byte, ktype keyType, usage keyUsage) ([]byte, error) {
 
 	ref := C.ec_key_from_binary(
 		keyPtr.Uchar(),
-		C.ulong(len(key)), // TODO? ecPrivateKeyLength,
+		C.size_t(len(key)), // TODO? ecPrivateKeyLength,
 		ktype.CType(),
 		usage.CType(),
 		C.bool(true),
@@ -254,7 +254,7 @@ func EcKeyToPublic(key []byte, ktype keyType, usage keyUsage) ([]byte, error) {
 		ref,
 		ktype.CType(),
 		pubPtr.Uchar(),
-		C.ulong(pubLen),
+		C.size_t(pubLen),
 		C.bool(false),
 	); status != 1 {
 		return nil, fmt.Errorf("EcKeyToPublic: C.ec_key_to_binary() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
@@ -269,7 +269,7 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]b
 
 	curve25519KeyRef := C.ec_key_from_binary(
 		curve25519PubPtr.Uchar(),
-		C.ulong(len(curve25519Pub)),
+		C.size_t(len(curve25519Pub)),
 		C.CURVE_25519,
 		C.ENCRYPTION_USAGE,
 		C.bool(false),
@@ -281,7 +281,7 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]b
 
 	nistp256KeyRef := C.ec_key_from_binary(
 		nistp256PubPtr.Uchar(),
-		C.ulong(len(nistp256Pub)), // NISTP256_PUB_KEY_LENGTH,
+		C.size_t(len(nistp256Pub)), // NISTP256_PUB_KEY_LENGTH,
 		C.NIST_P256,
 		C.ENCRYPTION_USAGE,
 		C.bool(false),
@@ -297,7 +297,7 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]b
 		curve25519KeyRef,
 		nistp256KeyRef,
 		plaintextPtr.Uchar(),
-		C.ulong(len(plaintext)),
+		C.size_t(len(plaintext)),
 		&cipherBuf,
 		&outLen,
 	); status != 1 {
@@ -311,7 +311,7 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) (
 	defer curve25519KeyPtr.Free()
 	curve25519KeyRef := C.ec_key_from_binary(
 		curve25519KeyPtr.Uchar(),
-		C.ulong(len(curve25519Key)),
+		C.size_t(len(curve25519Key)),
 		C.CURVE_25519,
 		C.ENCRYPTION_USAGE,
 		C.bool(true),
@@ -322,7 +322,7 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) (
 	defer nistp256KeyPtr.Free()
 	nistp256KeyRef := C.ec_key_from_binary(
 		nistp256KeyPtr.Uchar(),
-		C.ulong(len(nistp256Key)),
+		C.size_t(len(nistp256Key)),
 		C.NIST_P256,
 		C.ENCRYPTION_USAGE,
 		C.bool(true),
@@ -338,7 +338,7 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) (
 		curve25519KeyRef,
 		nistp256KeyRef,
 		ciphertextPtr.Uchar(),
-		C.ulong(len(ciphertext)),
+		C.size_t(len(ciphertext)),
 		&outBuf,
 		&outLen,
 	)
@@ -375,7 +375,7 @@ func HybridSign(curve25519_key, nistp256_key, message []byte) ([]byte, error) {
 		curve25519_key_ref,
 		nistp256_key_ref,
 		messagePtr.Uchar(),
-		C.ulong(len(message)),
+		C.size_t(len(message)),
 		signaturePtr.Uchar(),
 	)
 	if status != 1 {
@@ -410,7 +410,7 @@ func HybridVerify(curve25519_pub, nistp256_pub, signature, message []byte) (bool
 	status := C.ec_verify(
 		curve25519_key_ref,
 		nistp256_key_ref,
-		messagePtr.Uchar(), C.ulong(len(message)),
+		messagePtr.Uchar(), C.size_t(len(message)),
 		signaturePtr.Uchar(),
 	)
 	if status != 1 {
@@ -425,7 +425,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer curve25519PrivatePtr.Free()
 	curve25519PrivateRef := C.ec_key_from_binary(
 		curve25519PrivatePtr.Uchar(),
-		C.ulong(ecPrivateKeyLength),
+		C.size_t(ecPrivateKeyLength),
 		Curve25519.CType(),
 		EncryptionUsage.CType(),
 		C.bool(true),
@@ -436,7 +436,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer curve25519PublicPtr.Free()
 	curve25519PublicRef := C.ec_key_from_binary(
 		curve25519PublicPtr.Uchar(),
-		C.ulong(curve25519PubKeyLength),
+		C.size_t(curve25519PubKeyLength),
 		Curve25519.CType(),
 		EncryptionUsage.CType(),
 		C.bool(false),
@@ -447,7 +447,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer nistP256PrivatePtr.Free()
 	nistP256PrivateRef := C.ec_key_from_binary(
 		nistP256PrivatePtr.Uchar(),
-		C.ulong(ecPrivateKeyLength),
+		C.size_t(ecPrivateKeyLength),
 		NistP256.CType(),
 		EncryptionUsage.CType(),
 		C.bool(true),
@@ -458,7 +458,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer nistP256PublicPtr.Free()
 	nistP256PublicRef := C.ec_key_from_binary(
 		nistP256PublicPtr.Uchar(),
-		C.ulong(nistP256PubKeyLength),
+		C.size_t(nistP256PubKeyLength),
 		NistP256.CType(),
 		EncryptionUsage.CType(),
 		C.bool(false),
@@ -491,7 +491,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer curve25519PrivatePtr.Free()
 	curve25519PrivateRef := C.ec_key_from_binary(
 		curve25519PrivatePtr.Uchar(),
-		C.ulong(ecPrivateKeyLength),
+		C.size_t(ecPrivateKeyLength),
 		Curve25519.CType(),
 		EncryptionUsage.CType(),
 		C.bool(true),
@@ -502,7 +502,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer curve25519PublicPtr.Free()
 	curve25519PublicRef := C.ec_key_from_binary(
 		curve25519PublicPtr.Uchar(),
-		C.ulong(curve25519PubKeyLength),
+		C.size_t(curve25519PubKeyLength),
 		Curve25519.CType(),
 		EncryptionUsage.CType(),
 		C.bool(false),
@@ -513,7 +513,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer nistP256PrivatePtr.Free()
 	nistP256PrivateRef := C.ec_key_from_binary(
 		nistP256PrivatePtr.Uchar(),
-		C.ulong(ecPrivateKeyLength),
+		C.size_t(ecPrivateKeyLength),
 		NistP256.CType(),
 		EncryptionUsage.CType(),
 		C.bool(true),
@@ -524,7 +524,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer nistP256PublicPtr.Free()
 	nistP256PublicRef := C.ec_key_from_binary(
 		nistP256PublicPtr.Uchar(),
-		C.ulong(nistP256PubKeyLength),
+		C.size_t(nistP256PubKeyLength),
 		NistP256.CType(),
 		EncryptionUsage.CType(),
 		C.bool(false),
@@ -542,7 +542,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 		curve25519PrivateRef,
 		nistP256PrivateRef,
 		ciphertextPtr.Uchar(),
-		C.ulong(len(ciphertext)),
+		C.size_t(len(ciphertext)),
 		&outbuf,
 		&outlen,
 	)
