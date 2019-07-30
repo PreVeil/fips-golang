@@ -34,6 +34,23 @@ func TestAesEncrypt(t *testing.T) {
 	invalidSizeFixedIv, err := randBytes(20)
 	_, _, _, err = AesEncrypt(key, data, invalidSizeFixedIv)
 	require.Error(t, err)
+
+	// fixed iv
+	// fixed ciphertext
+	sameIV := []byte{180, 182, 193, 141, 134, 31, 133, 173, 88, 253, 131, 143}
+	fixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
+	require.NoError(t, err)
+	require.Equal(t, sameIV, iv)
+	for i := 0; i < 10; i++ {
+		sameFixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
+		require.NoError(t, err)
+		require.Equal(t, sameIV, iv)
+		require.Equal(t, fixedCipher, sameFixedCipher)
+
+		decipher, err = AesDecrypt(key, sameFixedCipher, tag, iv)
+		require.NoError(t, err)
+		require.Equal(t, data, decipher)
+	}
 }
 
 func TestCtypes(t *testing.T) {
