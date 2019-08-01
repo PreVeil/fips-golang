@@ -74,7 +74,9 @@ func getIV(inputIv []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid iv length")
 	}
 
-	return inputIv, nil
+	iv := make([]byte, ivLength)
+	copy(iv, inputIv)
+	return iv, nil
 }
 
 // Takes in AES_KEY_LENGTH size key,
