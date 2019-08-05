@@ -61,18 +61,38 @@ func randBytes(numBytes int) ([]byte, error) {
 	return buf, nil
 }
 
+func getIV(inputIv []byte) ([]byte, error) {
+	if len(inputIv) == 0 {
+		iv, err := randBytes(ivLength)
+		if err != nil {
+			return nil, err
+		}
+		return iv, nil
+	}
+
+	if len(inputIv) != ivLength {
+		return nil, fmt.Errorf("invalid iv length")
+	}
+
+	iv := make([]byte, ivLength)
+	copy(iv, inputIv)
+	return iv, nil
+}
+
 // Takes in AES_KEY_LENGTH size key,
 // returns (ciphertet, tag, iv)
-func AesEncrypt(key []byte, plaintext []byte) ([]byte, []byte, []byte, error) {
+func AesEncrypt(key []byte, plaintext []byte, inputIv []byte) ([]byte, []byte, []byte, error) {
 	keyPtr := newUnsignedArr(key)
 	defer keyPtr.Free()
 	plaintextPtr := newUnsignedArr(plaintext)
 	defer plaintextPtr.Free()
 
-	iv, err := randBytes(ivLength)
+	// if 0 byte iv is given, generate a random iv
+	iv, err := getIV(inputIv)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	ivPtr := newUnsignedArr(iv)
 	defer ivPtr.Free()
 

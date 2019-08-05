@@ -10,14 +10,47 @@ func TestAesEncrypt(t *testing.T) {
 	data, err := randBytes(15)
 	require.NoError(t, err)
 
+	// random iv
 	key, err := randBytes(aesKeyLength)
 	require.NoError(t, err)
-	ciphertext, tag, iv, err := AesEncrypt(key, data)
+	ciphertext, tag, iv, err := AesEncrypt(key, data, make([]byte, 0))
 	require.NoError(t, err)
 
 	actual, err := AesDecrypt(key, ciphertext, tag, iv)
 	require.NoError(t, err)
 	require.Equal(t, data, actual)
+
+	// given input iv
+	fixedIv, err := randBytes(ivLength)
+	cipher, tag, iv, err := AesEncrypt(key, data, fixedIv)
+	require.NoError(t, err)
+	require.Equal(t, fixedIv, iv)
+
+	decipher, err := AesDecrypt(key, cipher, tag, iv)
+	require.NoError(t, err)
+	require.Equal(t, data, decipher)
+
+	// bad input iv
+	invalidSizeFixedIv, err := randBytes(20)
+	_, _, _, err = AesEncrypt(key, data, invalidSizeFixedIv)
+	require.Error(t, err)
+
+	// fixed iv
+	// fixed ciphertext
+	sameIV := []byte{180, 182, 193, 141, 134, 31, 133, 173, 88, 253, 131, 143}
+	fixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
+	require.NoError(t, err)
+	require.Equal(t, sameIV, iv)
+	for i := 0; i < 10; i++ {
+		sameFixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
+		require.NoError(t, err)
+		require.Equal(t, sameIV, iv)
+		require.Equal(t, fixedCipher, sameFixedCipher)
+
+		decipher, err = AesDecrypt(key, sameFixedCipher, tag, iv)
+		require.NoError(t, err)
+		require.Equal(t, data, decipher)
+	}
 }
 
 func TestCtypes(t *testing.T) {
@@ -27,6 +60,23 @@ func TestCtypes(t *testing.T) {
 	defer ua.Free()
 	bytes := ua.Bytes()
 	require.Equal(t, bytes, arr)
+}
+
+func TestGetIV(t *testing.T) {
+	invalidIV, err := randBytes(10000)
+	require.NoError(t, err)
+	_, err = getIV(invalidIV)
+	require.Error(t, err)
+
+	arr, err := randBytes(ivLength)
+	require.NoError(t, err)
+	iv, err := getIV(arr)
+	require.NoError(t, err)
+	require.Equal(t, iv, arr)
+
+	randIv, err := getIV(make([]byte, 0))
+	require.NoError(t, err)
+	require.Equal(t, len(randIv), ivLength)
 }
 
 func TestEcKeys(t *testing.T) {
