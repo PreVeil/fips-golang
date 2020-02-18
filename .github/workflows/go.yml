@@ -20,8 +20,24 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    - name: Add fips-temp to PATH
-      run: echo "::add-path::$(pwd)/fips-temp"
+    # - name: Add fips-temp to PATH
+      # run: echo "::add-path::$(pwd)/fips-temp"
+
+    # - uses: actions/checkout@v2
+    #   with:
+    #     repository: PreVeil/fips-crypto
+    #     ref: refs/tags/release/latest
+    #     token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
+    #     path: ./fipscrypto
+
+    - name: Set up fips-crypto
+      run: |
+        # COMMIT_ID=$(git rev-list -n 1 release/latest)
+        # echo "fips-commit-id:" $COMMIT_ID
+        # aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.so /usr/local/lib
+        rm -rf /usr/local/include/fips-crypto && mkdir /usr/local/include/fips-crypto
+        cp ./fips-temp/fips-crypto.h /usr/local/include/fips-crypto
+        cp ./fips-temp/libfips-crypto.so /usr/local/lib
 
     - name: Run unit tests
       run: make test
