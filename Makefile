@@ -42,7 +42,7 @@ build: clean
 test:
 	$(GO) clean -testcache || true
 ifeq ($(OS),Windows_NT)
-	@echo "TODO"
+	$(GO) test ./...
 else
 ifeq ($(shell uname -s),Linux)
 	$(GO_LINUX) test ./...
