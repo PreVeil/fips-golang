@@ -21,9 +21,9 @@ ifneq ($(FIPSDIR),)
     else
         ifeq ($(shell uname -s),Linux)
             CGO_LDFLAGS := -ldl -lm $(CGO_LDFLAGS)
-            FLAGS := env LD_LIBRARY_PATH="$(FIPSDIR):/usr/local/lib" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+            FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         else
-            FLAGS := env DYLD_LIBRARY_PATH="$(FIPSDIR):/usr/local/lib" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+            FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         endif
     endif
 endif
