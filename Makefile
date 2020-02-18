@@ -1,13 +1,21 @@
-#name of the package
-BUILD_PKG	:= fips
-GOPATH := $(realpath $(dir $(realpath $(dir $(shell pwd)))))
+define USAGE
+USAGE:
+> make [
+	build: build for the current platform
+	install: build for the current platform
 
-UNAME	:= $(shell uname)
-ifeq ($(UNAME), CYGWIN_NT-10.0)
-GOPATH	:= $(shell cygpath -w "$(GOPATH)")
-endif
-ifeq ($(UNAME), CYGWIN_NT-6.3)
-GOPATH	:= $(shell cygpath -w "$(GOPATH)")
+	test: run all unit tests
+	test-unit: run all unit tests
+	clean: clean test cache and other builds
+]
+endef
+export USAGE
+
+# name of the package
+BUILD_PKG	:= fips
+
+ifeq ($(GOPATH),)
+GOPATH := $(PWD)
 endif
 
 $(info $$GOPATH is [${GOPATH}])
@@ -24,24 +32,28 @@ DEP	:= env GOPATH="$(GOPATH)" dep
 GOBUILD := $(GO) build -gcflags="-e"
 GOINSTALL := $(GO) install -gcflags="-e"
 
+sense:
+	@echo "$$USAGE"
+
+help: sense
+
 all: deps install
 
 deps:
 	env GOPATH="$(GOPATH)" dep ensure
 
 ## install commands
-install: 
+install:
 	$(GO) clean -cache
 	$(GOINSTALL) 
 
-build: 
+build:
 	$(GOBUILD)
 
-run: deps install 
-	#now run it.
+run: deps install
 	$(GOPATH)/bin/fips
 
-test: 
+test:
 	$(GO) clean -testcache
 	$(GO) test ./...
 
