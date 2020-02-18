@@ -34,11 +34,11 @@ jobs:
     # echo "fips-commit-id:" $COMMIT_ID
     # aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.so /usr/local/lib
 
-    - name: Set up fips-crypto
-      run: |
-        rm -rf /usr/local/include/fips-crypto && sudo mkdir /usr/local/include/fips-crypto
-        sudo cp ./fips-temp/fips-crypto/fips-crypto.h /usr/local/include/fips-crypto
-        sudo cp ./fips-temp/libfips-crypto.so /usr/local/lib
+    # - name: Set up fips-crypto
+    #   run: |
+    #     rm -rf /usr/local/include/fips-crypto && sudo mkdir /usr/local/include/fips-crypto
+    #     sudo cp ./fips-temp/fips-crypto/fips-crypto.h /usr/local/include/fips-crypto
+    #     sudo cp ./fips-temp/libfips-crypto.so /usr/local/lib
 
     - name: Run unit tests
-      run: make test
+      run: FIPSDIR=$(pwd)/fips-temp make test
