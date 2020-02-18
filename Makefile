@@ -8,19 +8,27 @@ USAGE:
 endef
 export USAGE
 
-# name of the package
-BUILD_PKG := fips
-BIN	:= $(PWD)/bin
-GO := go
 
+# build & test flags
 # if fipspath is set, use it
-# otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include
+# otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include for darwin
 ifneq ($(FIPSDIR),)
-GO_WIN := CGO_CFLAGS="-I$(FIPSDIR)" CGO_LDFLAGS="-L$(FIPSDIR)" go
-GO := env DYLD_LIBRARY_PATH="$(FIPSDIR):$(DYLD_LIBRARY_PATH)" CGO_CFLAGS="-I$(FIPSDIR)" CGO_LDFLAGS="-L$(FIPSDIR)" go
-GO_LINUX := env LD_LIBRARY_PATH="$(FIPSDIR):$(LD_LIBRARY_PATH)" CGO_CFLAGS="-I$(FIPSDIR)" CGO_LDFLAGS="-ldl -lm -L$(FIPSDIR)" go
+    CGO_CFLAGS := -I$(FIPSDIR)
+    CGO_LDFLAGS := -L$(FIPSDIR)
+    FLAGS := CGO_CFLAGS="$(CGO_CFLAGS)"
+    ifeq ($(OS),Windows_NT)
+        @echo "i am simple"
+    else
+        ifeq ($(shell uname -s),Linux)
+            CGO_LDFLAGS := -ldl -lm $(CGO_LDFLAGS)
+            FLAGS := env LD_LIBRARY_PATH="$(FIPSDIR):$(LD_LIBRARY_PATH)" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+        else
+            FLAGS := env DYLD_LIBRARY_PATH="$(FIPSDIR):$(DYLD_LIBRARY_PATH)" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+        endif
+    endif
 endif
 
+GO := $(FLAGS) go
 
 sense:
 	@echo "$$USAGE"
@@ -31,15 +39,7 @@ test: test-unit
 
 test-unit:
 	go clean -testcache || true
-ifeq ($(OS),Windows_NT)
-	$(GO_WIN) test ./...
-else
-ifeq ($(shell uname -s),Linux)
-	$(GO_LINUX) test ./...
-else
 	$(GO) test ./...
-endif
-endif
 
 clean:
 	go clean -cache || true
