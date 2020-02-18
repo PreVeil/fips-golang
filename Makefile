@@ -13,14 +13,8 @@ export USAGE
 
 # name of the package
 BUILD_PKG	:= fips
-
-ifeq ($(GOPATH),)
-GOPATH := $(PWD)
-endif
-
-$(info $$GOPATH is [${GOPATH}])
-BIN	:= $(GOPATH)/bin
-GO	:= env GOPATH="$(GOPATH)" go
+BIN	:= $(PWD)/bin
+GO	:= go
 
 # if fipspath is set, use it
 # otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include
@@ -28,7 +22,6 @@ ifneq ($(FIPSPATH),)
 GO := CGO_CFLAGS="-I$(FIPSPATH)" CGO_LDFLAGS="-L$(FIPSPATH)" $(GO)
 endif
 
-DEP	:= env GOPATH="$(GOPATH)" dep
 GOBUILD := $(GO) build -gcflags="-e"
 GOINSTALL := $(GO) install -gcflags="-e"
 
@@ -37,21 +30,13 @@ sense:
 
 help: sense
 
-all: deps install
+all: install
 
-deps:
-	env GOPATH="$(GOPATH)" dep ensure
+install: clean
+	$(GOINSTALL)
 
-## install commands
-install:
-	$(GO) clean -cache
-	$(GOINSTALL) 
-
-build:
+build: clean
 	$(GOBUILD)
-
-run: deps install
-	$(GOPATH)/bin/fips
 
 test:
 	$(GO) clean -testcache
