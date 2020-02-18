@@ -56,6 +56,7 @@ jobs:
         rm -rf /usr/local/include/fips-crypto && sudo mkdir /usr/include/fips-crypto
         sudo cp $(pwd)/fips-temp/fips-crypto/fips-crypto.h /usr/include/fips-crypto
         sudo cp $(pwd)/fips-temp/libfips-crypto.so /usr/lib
+        sudo chmod +x /usr/lib/libfips-crypto.so
         ls -lah /usr/include/fips-crypto
         ls -lah /usr/lib/libfips-crypto.so
 
