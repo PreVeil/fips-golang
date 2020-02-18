@@ -20,7 +20,7 @@ ifneq ($(FIPSDIR),)
 		FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
     else
         ifeq ($(shell uname -s),Linux)
-            CGO_LDFLAGS := $(CGO_LDFLAGS) -ldl -lm
+            CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,--no-as-needed -ldl -lm
             FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         else
             FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
