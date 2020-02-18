@@ -17,13 +17,13 @@ ifneq ($(FIPSDIR),)
     CGO_LDFLAGS := -L$(FIPSDIR)
     FLAGS := CGO_CFLAGS="$(CGO_CFLAGS)"
     ifeq ($(OS),Windows_NT)
-        @echo "i am simple"
+		FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
     else
         ifeq ($(shell uname -s),Linux)
             CGO_LDFLAGS := -ldl -lm $(CGO_LDFLAGS)
-            FLAGS := env LD_LIBRARY_PATH="$(FIPSDIR):$(LD_LIBRARY_PATH)" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+            FLAGS := env LD_LIBRARY_PATH="$(FIPSDIR):/usr/local/lib" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         else
-            FLAGS := env DYLD_LIBRARY_PATH="$(FIPSDIR):$(DYLD_LIBRARY_PATH)" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+            FLAGS := env DYLD_LIBRARY_PATH="$(FIPSDIR):/usr/local/lib" CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         endif
     endif
 endif
