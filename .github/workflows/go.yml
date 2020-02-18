@@ -27,8 +27,8 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    # - name: Add fips-temp to PATH
-      # run: echo "::add-path::$(pwd)/fips-temp"
+    - name: Add fips-temp to PATH
+      run: echo "::add-path::$(pwd)/fips-temp"
 
     # - uses: actions/checkout@v2
     #   with:
@@ -49,3 +49,4 @@ jobs:
 
     - name: Run unit tests
       run: FIPSDIR=$(pwd)/fips-temp make test
+      shell: bash
