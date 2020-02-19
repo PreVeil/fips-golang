@@ -1,0 +1,5 @@
+# global owner
+*    @hu13
+
+# CI owner
+.github/workflows/*  @hu13
