@@ -91,3 +91,8 @@ jobs:
       run: FIPSDIR=$(pwd)/$FIPS_DIR make test
       shell: bash
       working-directory: ./${{ env.FIPS_GOLANG_REPO }}
+
+    - name: Run code vetting
+      run: FIPSDIR=$(pwd)/$FIPS_DIR make vet
+      shell: bash
+      working-directory: ./${{ env.FIPS_GOLANG_REPO }}
