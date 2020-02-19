@@ -1,6 +1,6 @@
 # fips-golang
 
-https://github.com/PreVeil/fips-golang/workflows/CI/badge.svg
+![](https://github.com/PreVeil/fips-golang/workflows/CI/badge.svg)
 
 Go bindings for [fips-crypto](https://github.com/PreVeil/fips-crypto).
 
