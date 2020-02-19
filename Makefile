@@ -9,6 +9,8 @@ endef
 export USAGE
 
 
+# FIPSCRYPTO_HEAD_COMMIT := $(shell git ls-remote -q git@github.com:PreVeil/fips-crypto.git release/latest | awk '{print $$1}')
+
 # build & test flags
 # if fipspath is set, use it
 # otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include for darwin
