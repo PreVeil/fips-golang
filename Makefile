@@ -1,49 +1,45 @@
-#name of the package
-BUILD_PKG	:= fips
-GOPATH := $(realpath $(dir $(realpath $(dir $(shell pwd)))))
+define USAGE
+USAGE:
+> make [
+	test: run all unit tests
+	test-unit: run all unit tests
+	clean: ...
+]
+endef
+export USAGE
 
-UNAME	:= $(shell uname)
-ifeq ($(UNAME), CYGWIN_NT-10.0)
-GOPATH	:= $(shell cygpath -w "$(GOPATH)")
-endif
-ifeq ($(UNAME), CYGWIN_NT-6.3)
-GOPATH	:= $(shell cygpath -w "$(GOPATH)")
-endif
-
-$(info $$GOPATH is [${GOPATH}])
-BIN	:= $(GOPATH)/bin
-GO	:= env GOPATH="$(GOPATH)" go
-
+# build & test flags
 # if fipspath is set, use it
-# otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include
-ifneq ($(FIPSPATH),)
-GO := CGO_CFLAGS="-I$(FIPSPATH)" CGO_LDFLAGS="-L$(FIPSPATH)" $(GO)
+# otherwise, library should be in /usr/local/lib and headers should be in /usr/local/include for darwin
+ifneq ($(FIPSDIR),)
+    CGO_CFLAGS := -I$(FIPSDIR)
+    CGO_LDFLAGS := -L$(FIPSDIR)
+    FLAGS := CGO_CFLAGS="$(CGO_CFLAGS)"
+    ifeq ($(OS),Windows_NT)
+		FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+    else
+        ifeq ($(shell uname -s),Linux)
+            CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,--no-as-needed -ldl -lm
+            FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+        else
+            FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+        endif
+    endif
 endif
 
-DEP	:= env GOPATH="$(GOPATH)" dep
-GOBUILD := $(GO) build -gcflags="-e"
-GOINSTALL := $(GO) install -gcflags="-e"
+GO := $(FLAGS) go
 
-all: deps install
+sense:
+	@echo "$$USAGE"
 
-deps:
-	env GOPATH="$(GOPATH)" dep ensure
+help: sense
 
-## install commands
-install: 
-	$(GO) clean -cache
-	$(GOINSTALL) 
+test: test-unit
 
-build: 
-	$(GOBUILD)
-
-run: deps install 
-	#now run it.
-	$(GOPATH)/bin/fips
-
-test: 
-	$(GO) clean -testcache
+test-unit:
+	go clean -testcache || true
 	$(GO) test ./...
 
 clean:
-	$(GO) clean -cache
+	go clean -cache || true
+	go clean -testcache || true
