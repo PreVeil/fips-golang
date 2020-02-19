@@ -43,3 +43,6 @@ test-unit:
 clean:
 	go clean -cache || true
 	go clean -testcache || true
+
+vet:
+	$(GO) vet ./...
