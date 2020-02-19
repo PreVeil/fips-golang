@@ -8,6 +8,10 @@ on:
 jobs:
   test:
     name: Unit tester
+    env:
+      FIPS_REPO: fips-crypto-repo
+      FIPS_DIR: fips-temp
+      FIPS_GOLANG_REPO: fips-golang-repo
 
     strategy:
       fail-fast: false
@@ -26,42 +30,51 @@ jobs:
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+      with:
+        path: ${{ env.FIPS_GOLANG_REPO }}
 
-    - name: Add fips-temp to PATH
-      run: echo "::add-path::$(pwd)/fips-temp"
+    - uses: actions/checkout@v2
+      with:
+        repository: PreVeil/fips-crypto
+        ref: refs/tags/release/latest
+        token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
+        path: ${{ env.FIPS_REPO }}
 
-    # - uses: actions/checkout@v2
-    #   with:
-    #     repository: PreVeil/fips-crypto
-    #     ref: refs/tags/release/latest
-    #     token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
-    #     path: ./fipscrypto
-
-    # COMMIT_ID=$(git rev-list -n 1 release/latest)
-    # echo "fips-commit-id:" $COMMIT_ID
-    # aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.so /usr/local/lib
+    - name: Download fips libraries
+      run: |
+        COMMIT_ID=$(git rev-list -n 1 release/latest)
+        echo "fips-commit-id:" $COMMIT_ID
+        rm -rf $FIPS_DIR/fips-crypto && mkdir $FIPS_DIR/fips-crypto
+        cp ./lib/fips-crypto.h $FIPS_DIR/fips-crypto
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.dylib $FIPS_DIR/libfips-crypto.dylib
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_win_64/$COMMIT_ID/libfips-crypto.dll $FIPS_DIR/libfips-crypto.dll
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_linux/$COMMIT_ID/libfips-crypto.so $FIPS_DIR/libfips-crypto.so
+        echo "::add-path::$FIPS_DIR"
+      shell: bash
+      working-directory: ./${{ env.FIPS_REPO }}
+      env:
+        FIPS_DIR: ../${{ env.FIPS_GOLANG_REPO }}/${{ env.FIPS_DIR }}
 
     - name: Set up fips-crypto
       if: matrix.os == 'macos-latest'
       run: |
         rm -rf /usr/local/include/fips-crypto && mkdir /usr/local/include/fips-crypto
-        cp $(pwd)/fips-temp/fips-crypto/fips-crypto.h /usr/local/include/fips-crypto
-        cp $(pwd)/fips-temp/libfips-crypto.dylib /usr/local/lib
-        ls -lah /usr/local/include/fips-crypto
-        ls -lah /usr/local/lib/libfips-crypto.dylib
+        cp $(pwd)/$FIPS_DIR/fips-crypto/fips-crypto.h /usr/local/include/fips-crypto
+        cp $(pwd)/$FIPS_DIR/libfips-crypto.dylib /usr/local/lib
+      working-directory: ./${{ env.FIPS_GOLANG_REPO }}
 
     - name: Set up fips-crypto
       if: matrix.os == 'ubuntu-latest'
       run: |
         rm -rf /usr/local/include/fips-crypto && sudo mkdir /usr/include/fips-crypto
-        sudo cp $(pwd)/fips-temp/fips-crypto/fips-crypto.h /usr/include/fips-crypto
-        sudo cp $(pwd)/fips-temp/libfips-crypto.so /usr/lib
+        sudo cp $(pwd)/$FIPS_DIR/fips-crypto/fips-crypto.h /usr/include/fips-crypto
+        sudo cp $(pwd)/$FIPS_DIR/libfips-crypto.so /usr/lib
         sudo chmod +x /usr/lib/libfips-crypto.so
         sudo chown $USER /usr/lib/libfips-crypto.so
         sudo chown -R $USER /usr/include/fips-crypto
-        ls -lah /usr/include/fips-crypto
-        ls -lah /usr/lib/libfips-crypto.so
+      working-directory: ./${{ env.FIPS_GOLANG_REPO }}
 
     - name: Run unit tests
-      run: FIPSDIR=$(pwd)/fips-temp make test
+      run: FIPSDIR=$(pwd)/$FIPS_DIR make test
       shell: bash
+      working-directory: ./${{ env.FIPS_GOLANG_REPO }}
