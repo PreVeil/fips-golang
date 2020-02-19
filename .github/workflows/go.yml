@@ -44,7 +44,8 @@ jobs:
       run: |
         COMMIT_ID=$(git rev-list -n 1 release/latest)
         echo "fips-commit-id:" $COMMIT_ID
-        rm -rf $FIPS_DIR/fips-crypto && mkdir $FIPS_DIR/fips-crypto
+        rm -rf $FIPS_DIR && mkdir $FIPS_DIR
+        mkdir $FIPS_DIR/fips-crypto
         cp ./lib/fips-crypto.h $FIPS_DIR/fips-crypto
         aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.dylib $FIPS_DIR/libfips-crypto.dylib
         aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_win_64/$COMMIT_ID/libfips-crypto.dll $FIPS_DIR/libfips-crypto.dll
