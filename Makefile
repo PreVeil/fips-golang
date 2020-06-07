@@ -36,9 +36,8 @@ help: sense
 
 test: test-unit
 
-test-unit:
-	go clean -testcache || true
-	$(GO) test ./...
+test-unit: clean
+	$(GO) test ./... -v
 
 clean:
 	go clean -cache || true
@@ -46,3 +45,6 @@ clean:
 
 vet:
 	$(GO) vet ./...
+
+test-benchmark: clean
+	$(GO) test -run=XXX -bench=. -v
