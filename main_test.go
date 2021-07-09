@@ -62,19 +62,22 @@ func TestCtypes(t *testing.T) {
 	require.Equal(t, bytes, arr)
 }
 
-func TestGetIV(t *testing.T) {
+func TestInitAesEncrypt(t *testing.T) {
+	key, err := randBytes(aesKeyLength)
+	require.NoError(t, err)
+
 	invalidIV, err := randBytes(10000)
 	require.NoError(t, err)
-	_, err = getIV(invalidIV)
+	_, _, err = initAesEncrypt(key, invalidIV)
 	require.Error(t, err)
 
 	arr, err := randBytes(ivLength)
 	require.NoError(t, err)
-	iv, err := getIV(arr)
+	_, iv, err := initAesEncrypt(key, arr)
 	require.NoError(t, err)
 	require.Equal(t, iv, arr)
 
-	randIv, err := getIV(make([]byte, 0))
+	_, randIv, err := initAesEncrypt(key, make([]byte, 0))
 	require.NoError(t, err)
 	require.Equal(t, len(randIv), ivLength)
 }
@@ -100,11 +103,19 @@ func TestHybridEncrypt(t *testing.T) {
 	data, err := randBytes(20)
 	require.NoError(t, err)
 
-	cipher, err := HybridSeal(raw25519PubKey, raw256PubKey, data)
+	// sha256 key derivation function
+	cipher, err := HybridSeal(raw25519PubKey, raw256PubKey, data, false)
 	require.NoError(t, err)
-	actual, err := HybridUnseal(raw25519Key, raw256Key, cipher)
+	actual, err := HybridUnseal(raw25519Key, raw256Key, cipher, false)
 	require.NoError(t, err)
 	require.Equal(t, data, actual)
+
+	// fips key derivation function
+	fipsCipher, err := HybridSeal(raw25519PubKey, raw256PubKey, data, true)
+	require.NoError(t, err)
+	fipsActual, err := HybridUnseal(raw25519Key, raw256Key, fipsCipher, true)
+	require.NoError(t, err)
+	require.Equal(t, data, fipsActual)
 }
 
 func TestHybridSign(t *testing.T) {
@@ -136,10 +147,10 @@ func TestHybridBoxEncrypt(t *testing.T) {
 	data, err := randBytes(20)
 	require.NoError(t, err)
 
-	cipher, err := HybridBoxEncrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, data)
+	cipher, err := HybridBoxEncrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, data, true)
 	require.NoError(t, err)
 
-	actual, err := HybridBoxDecrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, cipher)
+	actual, err := HybridBoxDecrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, cipher, true)
 	require.NoError(t, err)
 	require.Equal(t, data, actual)
 }
