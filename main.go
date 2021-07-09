@@ -16,7 +16,7 @@ const (
 	aesKeyLength = C.AES_KEY_LENGTH
 	aesBlockSize = 16
 	ivLength     = C.AES_IV_LENGTH
-	aesTagLength = C.AES_TAG_LEN
+	aesTagLength = C.AES_TAG_LENGTH
 
 	ecPrivateKeyLength     = C.EC_PRIVATE_KEY_LENGTH
 	curve25519PubKeyLength = C.CURVE25519_PUB_KEY_LENGTH
@@ -61,46 +61,51 @@ func randBytes(numBytes int) ([]byte, error) {
 	return buf, nil
 }
 
-func getIV(inputIv []byte) ([]byte, error) {
+// Takes in AES_KEY_LENGTH size key, and inputIv (can be empty if iv generation is required)
+// returns (AES_REF, iv)
+func initAesEncrypt(key []byte, inputIv []byte) (C.AES_REF, []byte, error) {
+	keyPtr := newUnsignedArr(key)
+	defer keyPtr.Free()
+
 	if len(inputIv) == 0 {
-		iv, err := randBytes(ivLength)
-		if err != nil {
-			return nil, err
-		}
-		return iv, nil
+		ivBufPtr := newUnsignedArr(make([]byte, ivLength))
+		defer ivBufPtr.Free()
+
+		ref := C.aes_encrypt_init(keyPtr.Uchar(), ivBufPtr.Uchar())
+		iv := ivBufPtr.Bytes()[:ivLength]
+		return ref, iv, nil
 	}
 
 	if len(inputIv) != ivLength {
-		return nil, fmt.Errorf("invalid iv length")
+		return nil, nil, fmt.Errorf("invalid iv length")
 	}
+
+	ivPtr := newUnsignedArr(inputIv)
+	defer ivPtr.Free()
+
+	ref := C.aes_encrypt_init_with_iv(keyPtr.Uchar(), ivPtr.Uchar())
 
 	iv := make([]byte, ivLength)
 	copy(iv, inputIv)
-	return iv, nil
+	return ref, iv, nil
 }
 
 // Takes in AES_KEY_LENGTH size key,
 // returns (ciphertet, tag, iv)
 func AesEncrypt(key []byte, plaintext []byte, inputIv []byte) ([]byte, []byte, []byte, error) {
-	keyPtr := newUnsignedArr(key)
-	defer keyPtr.Free()
 	plaintextPtr := newUnsignedArr(plaintext)
 	defer plaintextPtr.Free()
 
 	// if 0 byte iv is given, generate a random iv
-	iv, err := getIV(inputIv)
+	ref, iv, err := initAesEncrypt(key, inputIv)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	ivPtr := newUnsignedArr(iv)
-	defer ivPtr.Free()
 
 	var outLen C.int
 	outBufPtr := newUnsignedArr(make([]byte, len(plaintext)+aesBlockSize))
 	defer outBufPtr.Free()
 
-	ref := C.aes_encrypt_init(keyPtr.Uchar(), ivPtr.Uchar())
 	if status := C.aes_encrypt_update(
 		ref,
 		outBufPtr.Uchar(),
@@ -216,6 +221,24 @@ const (
 	EncryptionUsage keyUsage = 1
 )
 
+type keyDerivationFunction int32
+
+func (kdf keyDerivationFunction) CType() C.KDF_TYPE {
+	switch kdf {
+	case KdfSha256:
+		return C.KDF_SHA256
+	case KdfFips:
+		return C.KDF_FIPS
+	default:
+		return 0
+	}
+}
+
+const (
+	KdfSha256 keyDerivationFunction = 0
+	KdfFips   keyDerivationFunction = 1
+)
+
 // key, public
 func GenerateEcKey(ktype keyType, usage keyUsage) ([]byte, []byte, error) {
 	keyPtr := newUnsignedArr(make([]byte, ecPrivateKeyLength))
@@ -283,7 +306,7 @@ func EcKeyToPublic(key []byte, ktype keyType, usage keyUsage) ([]byte, error) {
 }
 
 // takes in 2 keys, double seals and returns ciphertext
-func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]byte, error) {
+func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte, useFipsDerivation bool) ([]byte, error) {
 	curve25519PubPtr := newUnsignedArr(curve25519Pub)
 	defer curve25519PubPtr.Free()
 
@@ -313,6 +336,12 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]b
 
 	var outLen C.int
 	var cipherBuf *C.uchar
+	var kdfType keyDerivationFunction
+	if useFipsDerivation {
+		kdfType = KdfFips
+	} else {
+		kdfType = KdfSha256
+	}
 	if status := C.hybrid_encrypt(
 		curve25519KeyRef,
 		nistp256KeyRef,
@@ -320,13 +349,15 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte) ([]b
 		C.size_t(len(plaintext)),
 		&cipherBuf,
 		&outLen,
+		kdfType.CType(),
+		C.bool(useFipsDerivation),
 	); status != 1 {
 		return nil, fmt.Errorf("HybridSeal: C.hybrid_encrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
 	return C.GoBytes(unsafe.Pointer(cipherBuf), outLen), nil
 }
 
-func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) ([]byte, error) {
+func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, useFipsDerivation bool) ([]byte, error) {
 	curve25519KeyPtr := newUnsignedArr(curve25519Key)
 	defer curve25519KeyPtr.Free()
 	curve25519KeyRef := C.ec_key_from_binary(
@@ -354,6 +385,12 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) (
 
 	var outLen C.int
 	var outBuf *C.uchar
+	var kdfType keyDerivationFunction
+	if useFipsDerivation {
+		kdfType = KdfFips
+	} else {
+		kdfType = KdfSha256
+	}
 	status := C.hybrid_decrypt(
 		curve25519KeyRef,
 		nistp256KeyRef,
@@ -361,6 +398,8 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte) (
 		C.size_t(len(ciphertext)),
 		&outBuf,
 		&outLen,
+		kdfType.CType(),
+		C.bool(useFipsDerivation),
 	)
 	if status != 1 {
 		return nil, fmt.Errorf("HybridUnseal: C.hybrid_decrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
@@ -439,7 +478,7 @@ func HybridVerify(curve25519_pub, nistp256_pub, signature, message []byte) (bool
 	return status == 1, nil
 }
 
-func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nistP256Public, plaintext []byte) ([]byte, error) {
+func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nistP256Public, plaintext []byte, useFipsDerivation bool) ([]byte, error) {
 	// get all references..
 	curve25519PrivatePtr := newUnsignedArr(curve25519Private)
 	defer curve25519PrivatePtr.Free()
@@ -489,6 +528,12 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer plaintextPtr.Free()
 	var outlen C.int
 	var outbuf *C.uchar
+	var kdfType keyDerivationFunction
+	if useFipsDerivation {
+		kdfType = KdfFips
+	} else {
+		kdfType = KdfSha256
+	}
 	status := C.box_encrypt(
 		curve25519PrivateRef,
 		nistP256PrivateRef,
@@ -498,6 +543,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 		C.int(len(plaintext)),
 		&outbuf,
 		&outlen,
+		kdfType.CType(),
 	)
 	if status != 1 {
 		return nil, fmt.Errorf("HybridBoxEncrypt: C.box_encrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
@@ -505,7 +551,7 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	return C.GoBytes(unsafe.Pointer(outbuf), outlen), nil
 }
 
-func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nistP256Public, ciphertext []byte) ([]byte, error) {
+func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nistP256Public, ciphertext []byte, useFipsDerivation bool) ([]byte, error) {
 	// get all references..
 	curve25519PrivatePtr := newUnsignedArr(curve25519Private)
 	defer curve25519PrivatePtr.Free()
@@ -556,6 +602,12 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	defer ciphertextPtr.Free()
 	var outlen C.int
 	var outbuf *C.uchar
+	var kdfType keyDerivationFunction
+	if useFipsDerivation {
+		kdfType = KdfFips
+	} else {
+		kdfType = KdfSha256
+	}
 	status := C.box_decrypt(
 		curve25519PublicRef,
 		nistP256PublicRef,
@@ -565,6 +617,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 		C.size_t(len(ciphertext)),
 		&outbuf,
 		&outlen,
+		kdfType.CType(),
 	)
 	if status != 1 {
 		return nil, fmt.Errorf("HybridBoxDecrypt: C.box_decrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
