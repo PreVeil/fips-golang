@@ -23,7 +23,7 @@ jobs:
     steps:
 
     - name: Set up Go 1.13
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v2
       with:
         go-version: 1.13
       id: go
@@ -36,7 +36,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         repository: PreVeil/fips-crypto
-        ref: refs/tags/release/latest
+        ref: refs/tags/release/1.1.0
         token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
         path: ${{ env.FIPS_REPO }}
 
@@ -54,15 +54,18 @@ jobs:
 
     - name: Download fips libraries
       run: |
-        COMMIT_ID=$(git rev-list -n 1 release/latest)
+        COMMIT_ID=$(git rev-list -n 1 release/1.1.0)
         echo "fips-commit-id:" $COMMIT_ID
         rm -rf $FIPS_DIR && mkdir $FIPS_DIR
         mkdir $FIPS_DIR/fips-crypto
         cp ./lib/fips-crypto.h $FIPS_DIR/fips-crypto
         aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.dylib $FIPS_DIR/libfips-crypto.dylib
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_osx/$COMMIT_ID/libfips-crypto.dylib.hmac $FIPS_DIR/libfips-crypto.dylib.hmac
         aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_win_64/$COMMIT_ID/libfips-crypto.dll $FIPS_DIR/libfips-crypto.dll
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_win_64/$COMMIT_ID/libfips-crypto.dll.hmac $FIPS_DIR/libfips-crypto.dll.hmac
         aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_linux/$COMMIT_ID/libfips-crypto.so $FIPS_DIR/libfips-crypto.so
-        echo "::add-path::$FIPS_DIR"
+        aws s3 cp s3://pv-bin-storage/ci/fipscrypto_build_linux/$COMMIT_ID/libfips-crypto.so.hmac $FIPS_DIR/libfips-crypto.so.hmac
+        echo "$FIPS_DIR" >> $GITHUB_PATH
       shell: bash
       working-directory: ./${{ env.FIPS_REPO }}
       env:
@@ -74,6 +77,7 @@ jobs:
         rm -rf /usr/local/include/fips-crypto && mkdir /usr/local/include/fips-crypto
         cp $(pwd)/$FIPS_DIR/fips-crypto/fips-crypto.h /usr/local/include/fips-crypto
         cp $(pwd)/$FIPS_DIR/libfips-crypto.dylib /usr/local/lib
+        cp $(pwd)/$FIPS_DIR/libfips-crypto.dylib.hmac /usr/local/lib
       working-directory: ./${{ env.FIPS_GOLANG_REPO }}
 
     - name: Set up fips-crypto
@@ -82,8 +86,10 @@ jobs:
         rm -rf /usr/local/include/fips-crypto && sudo mkdir /usr/include/fips-crypto
         sudo cp $(pwd)/$FIPS_DIR/fips-crypto/fips-crypto.h /usr/include/fips-crypto
         sudo cp $(pwd)/$FIPS_DIR/libfips-crypto.so /usr/lib
+        sudo cp $(pwd)/$FIPS_DIR/libfips-crypto.so.hmac /usr/lib
         sudo chmod +x /usr/lib/libfips-crypto.so
         sudo chown $USER /usr/lib/libfips-crypto.so
+        sudo chown $USER /usr/lib/libfips-crypto.so.hmac
         sudo chown -R $USER /usr/include/fips-crypto
       working-directory: ./${{ env.FIPS_GOLANG_REPO }}
 
