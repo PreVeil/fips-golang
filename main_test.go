@@ -147,10 +147,19 @@ func TestHybridBoxEncrypt(t *testing.T) {
 	data, err := randBytes(20)
 	require.NoError(t, err)
 
-	cipher, err := HybridBoxEncrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, data, true)
+	// sha256 key derivation function
+	cipher, err := HybridBoxEncrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, data, false)
 	require.NoError(t, err)
 
-	actual, err := HybridBoxDecrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, cipher, true)
+	actual, err := HybridBoxDecrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, cipher, false)
 	require.NoError(t, err)
 	require.Equal(t, data, actual)
+
+	// fips key derivation function
+	fipsCipher, err := HybridBoxEncrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, data, true)
+	require.NoError(t, err)
+
+	fipsActual, err := HybridBoxDecrypt(raw25519Key, raw25519PubKey, raw256Key, raw256PubKey, fipsCipher, true)
+	require.NoError(t, err)
+	require.Equal(t, data, fipsActual)
 }
