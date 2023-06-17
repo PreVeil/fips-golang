@@ -22,10 +22,10 @@ jobs:
 
     steps:
 
-    - name: Set up Go 1.13
+    - name: Set up Go 1.19
       uses: actions/setup-go@v2
       with:
-        go-version: 1.13
+        go-version: 1.19
       id: go
 
     - name: Check out code into the Go module directory
@@ -39,11 +39,6 @@ jobs:
         ref: refs/tags/release/1.1.0
         token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
         path: ${{ env.FIPS_REPO }}
-
-    - name: Install aws cli
-      run: |
-        pip install wheel
-        pip install awscli
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
