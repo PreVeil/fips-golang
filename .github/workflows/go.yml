@@ -29,14 +29,15 @@ jobs:
       id: go
 
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: ${{ env.FIPS_GOLANG_REPO }}
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         repository: PreVeil/fips-crypto
-        ref: refs/tags/release/1.1.0
+        ref: refs/tags/release/1.2.2
+        fetch-depth: 0
         token: ${{ secrets.PREVEIL_DEPLOY_USER_TOKEN }}
         path: ${{ env.FIPS_REPO }}
 
@@ -49,7 +50,7 @@ jobs:
 
     - name: Download fips libraries
       run: |
-        COMMIT_ID=$(git rev-list -n 1 release/1.1.0)
+        COMMIT_ID=$(git rev-list -n 1 release/1.2.2)
         echo "fips-commit-id:" $COMMIT_ID
         rm -rf $FIPS_DIR && mkdir $FIPS_DIR
         mkdir $FIPS_DIR/fips-crypto
