@@ -41,6 +41,7 @@ func TestAesEncrypt(t *testing.T) {
 	fixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
 	require.NoError(t, err)
 	require.Equal(t, sameIV, iv)
+	buf := make([]byte, 1024)
 	for i := 0; i < 10; i++ {
 		sameFixedCipher, tag, iv, err := AesEncrypt(key, data, sameIV)
 		require.NoError(t, err)
@@ -50,6 +51,10 @@ func TestAesEncrypt(t *testing.T) {
 		decipher, err = AesDecrypt(key, sameFixedCipher, tag, iv)
 		require.NoError(t, err)
 		require.Equal(t, data, decipher)
+
+		err = AesDecryptWithBuffer(key, sameFixedCipher, tag, iv, buf)
+		require.NoError(t, err)
+		require.Equal(t, data, buf[:len(data)])
 	}
 }
 

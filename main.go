@@ -49,7 +49,17 @@ func (ua UnsignedArr) Uchar() *C.uchar {
 }
 
 func (ua UnsignedArr) Bytes() []byte {
-	return C.GoBytes(ua.p, C.int(ua.size))
+	buf := make([]byte, ua.size)
+	s := unsafe.Slice((*byte)(ua.p), ua.size)
+	copy(buf, s)
+	return buf[:ua.size]
+}
+
+func (ua UnsignedArr) BytesWithBuffer(buf []byte) {
+	s := unsafe.Slice((*byte)(ua.p), ua.size)
+	copy(buf, s)
+	fmt.Println("buf", len(buf), len(buf[:ua.size]))
+	buf = buf[:ua.size]
 }
 
 func randBytes(numBytes int) ([]byte, error) {
@@ -135,6 +145,43 @@ func AesEncrypt(key []byte, plaintext []byte, inputIv []byte) ([]byte, []byte, [
 	// now need to append outBuf[:outLen] + padBuf[:padLen]
 	ciphertext := append(outBufPtr.Bytes()[:outLen], padBufPtr.Bytes()[:padLen]...)
 	return ciphertext, tagPtr.Bytes(), iv, nil
+}
+
+func AesDecryptWithBuffer(key, ciphertext, tag, iv, buf []byte) error {
+	keyPtr := newUnsignedArr(key)
+	defer keyPtr.Free()
+
+	cipherTextPtr := newUnsignedArr(ciphertext)
+	defer cipherTextPtr.Free()
+
+	ivPtr := newUnsignedArr(iv)
+	defer ivPtr.Free()
+
+	var outLen C.int
+	outPtr := newUnsignedArr(make([]byte, len(ciphertext)+aesBlockSize))
+	defer outPtr.Free()
+
+	ref := C.aes_decrypt_init(keyPtr.Uchar(), ivPtr.Uchar())
+	if status := C.aes_decrypt_update(
+		ref,
+		outPtr.Uchar(),
+		&outLen,
+		cipherTextPtr.Uchar(),
+		C.int(len(ciphertext)),
+	); status != 1 {
+		return fmt.Errorf("AesDecrypt: C.aes_decrypt_update() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
+	}
+
+	tagPtr := newUnsignedArr(tag)
+	defer tagPtr.Free()
+	if status := C.aes_decrypt_finalize(
+		ref,
+		tagPtr.Uchar(),
+	); status != 1 {
+		return fmt.Errorf("AesDecrypt: C.aes_decrypt_finalize() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
+	}
+	outPtr.BytesWithBuffer(buf)
+	return nil
 }
 
 func AesDecrypt(key []byte, ciphertext []byte, tag []byte, iv []byte) ([]byte, error) {
