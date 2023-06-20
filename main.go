@@ -49,17 +49,11 @@ func (ua UnsignedArr) Uchar() *C.uchar {
 }
 
 func (ua UnsignedArr) Bytes() []byte {
-	buf := make([]byte, ua.size)
-	s := unsafe.Slice((*byte)(ua.p), ua.size)
-	copy(buf, s)
-	return buf[:ua.size]
+	return C.GoBytes(ua.p, C.int(ua.size))
 }
 
-func (ua UnsignedArr) BytesWithBuffer(buf []byte) {
-	s := unsafe.Slice((*byte)(ua.p), ua.size)
-	copy(buf, s)
-	fmt.Println("buf", len(buf), len(buf[:ua.size]))
-	buf = buf[:ua.size]
+func (ua UnsignedArr) BytesWithBuffer(outLen C.int) []byte {
+	return unsafe.Slice((*byte)(ua.p), outLen)
 }
 
 func randBytes(numBytes int) ([]byte, error) {
@@ -147,7 +141,7 @@ func AesEncrypt(key []byte, plaintext []byte, inputIv []byte) ([]byte, []byte, [
 	return ciphertext, tagPtr.Bytes(), iv, nil
 }
 
-func AesDecryptWithBuffer(key, ciphertext, tag, iv, buf []byte) error {
+func AesDecryptWithBuffer(key, ciphertext, tag, iv []byte, buf *[]byte) error {
 	keyPtr := newUnsignedArr(key)
 	defer keyPtr.Free()
 
@@ -180,7 +174,8 @@ func AesDecryptWithBuffer(key, ciphertext, tag, iv, buf []byte) error {
 	); status != 1 {
 		return fmt.Errorf("AesDecrypt: C.aes_decrypt_finalize() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
-	outPtr.BytesWithBuffer(buf)
+	*buf = (*buf)[:outLen]
+	copy(*buf, outPtr.BytesWithBuffer(outLen))
 	return nil
 }
 
