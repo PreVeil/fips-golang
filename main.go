@@ -170,6 +170,9 @@ func AesDecryptWithBuffer(key, ciphertext, tag, iv []byte, buf *[]byte) error {
 	); status != 1 {
 		return fmt.Errorf("AesDecrypt: C.aes_decrypt_finalize() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	if int32(cap(*buf)) < int32(outLen) {
+		return fmt.Errorf("provided buf does not have sufficient cap for the output")
+	}
 	// read the byte data of size outLen from the C slice without copy with unsafe.Slice
 	*buf = (*buf)[:outLen]
 	copy(*buf, unsafe.Slice((*byte)(outPtr.p), outLen))
