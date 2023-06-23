@@ -52,10 +52,6 @@ func (ua UnsignedArr) Bytes() []byte {
 	return C.GoBytes(ua.p, C.int(ua.size))
 }
 
-func (ua UnsignedArr) BytesWithBuffer(outLen C.int) []byte {
-	return unsafe.Slice((*byte)(ua.p), outLen)
-}
-
 func randBytes(numBytes int) ([]byte, error) {
 	buf := make([]byte, numBytes)
 	_, err := rand.Read(buf)
@@ -174,8 +170,9 @@ func AesDecryptWithBuffer(key, ciphertext, tag, iv []byte, buf *[]byte) error {
 	); status != 1 {
 		return fmt.Errorf("AesDecrypt: C.aes_decrypt_finalize() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	// read the byte data of size outLen from the C slice without copy with unsafe.Slice
 	*buf = (*buf)[:outLen]
-	copy(*buf, outPtr.BytesWithBuffer(outLen))
+	copy(*buf, unsafe.Slice((*byte)(outPtr.p), outLen))
 	return nil
 }
 
