@@ -137,6 +137,48 @@ func AesEncrypt(key []byte, plaintext []byte, inputIv []byte) ([]byte, []byte, [
 	return ciphertext, tagPtr.Bytes(), iv, nil
 }
 
+func AesDecryptWithBuffer(key, ciphertext, tag, iv []byte, buf *[]byte) error {
+	keyPtr := newUnsignedArr(key)
+	defer keyPtr.Free()
+
+	cipherTextPtr := newUnsignedArr(ciphertext)
+	defer cipherTextPtr.Free()
+
+	ivPtr := newUnsignedArr(iv)
+	defer ivPtr.Free()
+
+	var outLen C.int
+	outPtr := newUnsignedArr(make([]byte, len(ciphertext)+aesBlockSize))
+	defer outPtr.Free()
+
+	ref := C.aes_decrypt_init(keyPtr.Uchar(), ivPtr.Uchar())
+	if status := C.aes_decrypt_update(
+		ref,
+		outPtr.Uchar(),
+		&outLen,
+		cipherTextPtr.Uchar(),
+		C.int(len(ciphertext)),
+	); status != 1 {
+		return fmt.Errorf("AesDecrypt: C.aes_decrypt_update() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
+	}
+
+	tagPtr := newUnsignedArr(tag)
+	defer tagPtr.Free()
+	if status := C.aes_decrypt_finalize(
+		ref,
+		tagPtr.Uchar(),
+	); status != 1 {
+		return fmt.Errorf("AesDecrypt: C.aes_decrypt_finalize() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
+	}
+	if int32(cap(*buf)) < int32(outLen) {
+		return fmt.Errorf("provided buf does not have sufficient cap for the output")
+	}
+	// read the byte data of size outLen from the C slice without copy with unsafe.Slice
+	*buf = (*buf)[:outLen]
+	copy(*buf, unsafe.Slice((*byte)(outPtr.p), outLen))
+	return nil
+}
+
 func AesDecrypt(key []byte, ciphertext []byte, tag []byte, iv []byte) ([]byte, error) {
 	keyPtr := newUnsignedArr(key)
 	defer keyPtr.Free()
