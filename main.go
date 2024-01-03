@@ -3,7 +3,7 @@ package fips
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include "fips-crypto/fips-crypto.h"
-// #cgo LDFLAGS: -lfips-crypto
+// #cgo LDFLAGS: -lfips-crypto -Wl,-rpath,./
 import "C"
 
 import (
