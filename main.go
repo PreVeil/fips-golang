@@ -455,6 +455,56 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, u
 	return C.GoBytes(unsafe.Pointer(outBuf), outLen), nil
 }
 
+// HybridDeriveDecryptionKey computes the derived AES key needed to decrypt ciphertext, but doesn't fully decrypt it.
+// It takes the same keys and ciphertext as HybridUnseal.
+func HybridDeriveDecryptionKey(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, useFipsDerivation bool) ([]byte, error) {
+	curve25519KeyPtr := newUnsignedArr(curve25519Key)
+	defer curve25519KeyPtr.Free()
+	curve25519KeyRef := C.ec_key_from_binary(
+		curve25519KeyPtr.Uchar(),
+		C.size_t(len(curve25519Key)),
+		C.CURVE_25519,
+		C.ENCRYPTION_USAGE,
+		C.bool(true),
+	)
+	defer C.ec_key_free(curve25519KeyRef)
+
+	nistp256KeyPtr := newUnsignedArr(nistp256Key)
+	defer nistp256KeyPtr.Free()
+	nistp256KeyRef := C.ec_key_from_binary(
+		nistp256KeyPtr.Uchar(),
+		C.size_t(len(nistp256Key)),
+		C.NIST_P256,
+		C.ENCRYPTION_USAGE,
+		C.bool(true),
+	)
+	defer C.ec_key_free(nistp256KeyRef)
+
+	ciphertextPtr := newUnsignedArr(ciphertext)
+	defer ciphertextPtr.Free()
+
+	aesKeyPtr := newUnsignedArr(make([]byte, aesKeyLength))
+	defer aesKeyPtr.Free()
+
+	var kdfType keyDerivationFunction
+	if useFipsDerivation {
+		kdfType = KdfFips
+	} else {
+		kdfType = KdfSha256
+	}
+	if status := C.hybrid_derive_decryption_key(
+		curve25519KeyRef,
+		nistp256KeyRef,
+		ciphertextPtr.Uchar(),
+		C.size_t(len(ciphertext)),
+		kdfType.CType(),
+		aesKeyPtr.Uchar(),
+	); status != 1 {
+		return nil, fmt.Errorf("HybridDeriveDecryptionKey: C.hybrid_derive_decryption_key() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
+	}
+	return aesKeyPtr.Bytes(), nil
+}
+
 func HybridSign(curve25519_key, nistp256_key, message []byte) ([]byte, error) {
 	curve25519KeyPtr := newUnsignedArr(curve25519_key)
 	defer curve25519KeyPtr.Free()
