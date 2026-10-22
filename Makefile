@@ -23,6 +23,9 @@ ifneq ($(FIPSDIR),)
             FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
         else
             FLAGS := CGO_LDFLAGS="$(CGO_LDFLAGS)" $(FLAGS)
+            # dyld finds libfips-crypto.dylib only through DYLD_LIBRARY_PATH, which macOS strips
+            # from go's environment, so have go run the test binary through env.
+            TEST_EXEC := -exec "env DYLD_LIBRARY_PATH=$(FIPSDIR)"
         endif
     endif
 endif
@@ -38,7 +41,7 @@ test: test-unit
 
 test-unit:
 	go clean -testcache || true
-	$(GO) test ./...
+	$(GO) test $(TEST_EXEC) ./...
 
 clean:
 	go clean -cache || true

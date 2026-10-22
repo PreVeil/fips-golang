@@ -396,6 +396,8 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte, useF
 	); status != 1 {
 		return nil, fmt.Errorf("HybridSeal: C.hybrid_encrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	// TODO: cipherBuf is allocated by C and never freed, so it leaks on every call.
+	// Free it with C.fips_crypto_free after copying it.
 	return C.GoBytes(unsafe.Pointer(cipherBuf), outLen), nil
 }
 
@@ -446,6 +448,10 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, u
 	if status != 1 {
 		return nil, fmt.Errorf("HybridUnseal: C.hybrid_decrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	// TODO: outBuf is allocated by C and never freed, so it leaks on every call. Free it with
+	// C.fips_crypto_free after copying it, only on success: on failure hybrid_decrypt frees it
+	// itself. Also reject an outLen larger than the payload (len(ciphertext) minus the header),
+	// which is all hybrid_decrypt allocates.
 	return C.GoBytes(unsafe.Pointer(outBuf), outLen), nil
 }
 
@@ -590,6 +596,8 @@ func HybridBoxEncrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	if status != 1 {
 		return nil, fmt.Errorf("HybridBoxEncrypt: C.box_encrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	// TODO: outbuf is allocated by C and never freed, so it leaks on every call.
+	// Free it with C.fips_crypto_free after copying it.
 	return C.GoBytes(unsafe.Pointer(outbuf), outlen), nil
 }
 
@@ -664,5 +672,7 @@ func HybridBoxDecrypt(curve25519Private, curve25519Public, nistP256Private, nist
 	if status != 1 {
 		return nil, fmt.Errorf("HybridBoxDecrypt: C.box_decrypt() status %v, error: %v", status, C.GoString(C.fips_crypto_last_error()))
 	}
+	// TODO: outbuf is allocated by C and never freed, so it leaks on every call.
+	// Free it with C.fips_crypto_free after copying it.
 	return C.GoBytes(unsafe.Pointer(outbuf), outlen), nil
 }
