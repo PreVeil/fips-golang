@@ -7,8 +7,10 @@ package fips
 import "C"
 
 import (
+	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"unsafe"
 )
 
@@ -401,6 +403,42 @@ func HybridSeal(curve25519Pub []byte, nistp256Pub []byte, plaintext []byte, useF
 	return C.GoBytes(unsafe.Pointer(cipherBuf), outLen), nil
 }
 
+// checkHybridCiphertextLength requires a complete header and a nonempty payload, matching
+// hybrid_decrypt's format check, because hybrid_derive_decryption_key reads the ephemeral
+// keys without checking the length.
+func checkHybridCiphertextLength(ciphertext []byte, useFipsDerivation bool) error {
+	headerLen := curve25519PubKeyLength + nistP256PubKeyLength + aesTagLength
+	if useFipsDerivation {
+		headerLen += ivLength
+	}
+	if len(ciphertext) <= headerLen {
+		return fmt.Errorf("ciphertext too short: got %d bytes, need more than %d", len(ciphertext), headerLen)
+	}
+	return nil
+}
+
+// validateHybridDecryptInput runs before allocating or passing inputs to C.
+func validateHybridDecryptInput(curve25519Key, nistp256Key, ciphertext []byte, useFipsDerivation bool) error {
+	if err := checkHybridCiphertextLength(ciphertext, useFipsDerivation); err != nil {
+		return err
+	}
+	if len(curve25519Key) != ecPrivateKeyLength {
+		return fmt.Errorf("invalid X25519 private key length: got %d bytes, want %d", len(curve25519Key), ecPrivateKeyLength)
+	}
+	if len(nistp256Key) != ecPrivateKeyLength {
+		return fmt.Errorf("invalid P-256 private key length: got %d bytes, want %d", len(nistp256Key), ecPrivateKeyLength)
+	}
+	scalar := new(big.Int).SetBytes(nistp256Key)
+	if scalar.Sign() == 0 || scalar.Cmp(elliptic.P256().Params().N) >= 0 {
+		return fmt.Errorf("invalid P-256 private key: scalar must be in [1, N-1]")
+	}
+	ephemeralP256 := ciphertext[curve25519PubKeyLength : curve25519PubKeyLength+nistP256PubKeyLength]
+	if x, _ := elliptic.UnmarshalCompressed(elliptic.P256(), ephemeralP256); x == nil {
+		return fmt.Errorf("invalid ephemeral P-256 public key in ciphertext")
+	}
+	return nil
+}
+
 func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, useFipsDerivation bool) ([]byte, error) {
 	curve25519KeyPtr := newUnsignedArr(curve25519Key)
 	defer curve25519KeyPtr.Free()
@@ -458,6 +496,10 @@ func HybridUnseal(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, u
 // HybridDeriveDecryptionKey computes the derived AES key needed to decrypt ciphertext, but doesn't fully decrypt it.
 // It takes the same keys and ciphertext as HybridUnseal.
 func HybridDeriveDecryptionKey(curve25519Key []byte, nistp256Key []byte, ciphertext []byte, useFipsDerivation bool) ([]byte, error) {
+	if err := validateHybridDecryptInput(curve25519Key, nistp256Key, ciphertext, useFipsDerivation); err != nil {
+		return nil, fmt.Errorf("HybridDeriveDecryptionKey: %w", err)
+	}
+
 	curve25519KeyPtr := newUnsignedArr(curve25519Key)
 	defer curve25519KeyPtr.Free()
 	curve25519KeyRef := C.ec_key_from_binary(
@@ -467,6 +509,9 @@ func HybridDeriveDecryptionKey(curve25519Key []byte, nistp256Key []byte, ciphert
 		C.ENCRYPTION_USAGE,
 		C.bool(true),
 	)
+	if curve25519KeyRef == nil {
+		return nil, fmt.Errorf("HybridDeriveDecryptionKey: failed to import X25519 private key: %s", C.GoString(C.fips_crypto_last_error()))
+	}
 	defer C.ec_key_free(curve25519KeyRef)
 
 	nistp256KeyPtr := newUnsignedArr(nistp256Key)
@@ -478,6 +523,9 @@ func HybridDeriveDecryptionKey(curve25519Key []byte, nistp256Key []byte, ciphert
 		C.ENCRYPTION_USAGE,
 		C.bool(true),
 	)
+	if nistp256KeyRef == nil {
+		return nil, fmt.Errorf("HybridDeriveDecryptionKey: failed to import P-256 private key: %s", C.GoString(C.fips_crypto_last_error()))
+	}
 	defer C.ec_key_free(nistp256KeyRef)
 
 	ciphertextPtr := newUnsignedArr(ciphertext)
