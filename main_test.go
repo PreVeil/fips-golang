@@ -126,6 +126,42 @@ func TestHybridEncrypt(t *testing.T) {
 	require.Equal(t, data, fipsActual)
 }
 
+func TestHybridDeriveDecryptionKeyBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		fips      bool
+		headerLen int
+	}{
+		{"legacy", false, 81},
+		{"fips", true, 93},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Nil keys ensure rejection happens before importing keys into C.
+			for n := 0; n <= tc.headerLen; n++ {
+				out, err := HybridDeriveDecryptionKey(nil, nil, make([]byte, n), tc.fips)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "ciphertext too short")
+				require.Nil(t, out)
+			}
+
+			privX, pubX, err := GenerateEcKey(Curve25519, EncryptionUsage)
+			require.NoError(t, err)
+			privP, pubP, err := GenerateEcKey(NistP256, EncryptionUsage)
+			require.NoError(t, err)
+			plaintext := []byte{42}
+			ciphertext, err := HybridSeal(pubX, pubP, plaintext, tc.fips)
+			require.NoError(t, err)
+			require.Len(t, ciphertext, tc.headerLen+1)
+			key, err := HybridDeriveDecryptionKey(privX, privP, ciphertext, tc.fips)
+			require.NoError(t, err)
+			require.Len(t, key, aesKeyLength)
+			actual, err := HybridUnseal(privX, privP, ciphertext, tc.fips)
+			require.NoError(t, err)
+			require.Equal(t, plaintext, actual)
+		})
+	}
+}
+
 func TestHybridSign(t *testing.T) {
 	raw25519Key, raw25519PubKey, err := GenerateEcKey(Curve25519, SignatureUsage)
 	require.NoError(t, err)
